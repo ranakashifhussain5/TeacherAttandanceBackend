@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     unzip \
     zip \
+    nginx \
+    supervisor \
     libpng-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
@@ -37,6 +39,11 @@ RUN composer install --no-dev --optimize-autoloader
 RUN chown -R www-data:www-data storage bootstrap/cache
 RUN chmod -R 775 storage bootstrap/cache
 
-EXPOSE 9000
+# Web server + process manager config
+RUN rm -f /etc/nginx/sites-enabled/default
+COPY docker/nginx/coolify.conf /etc/nginx/conf.d/default.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-CMD ["php-fpm"]
+EXPOSE 80
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
