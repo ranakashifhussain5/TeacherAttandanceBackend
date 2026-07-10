@@ -108,4 +108,53 @@ class AttendanceController extends Controller
             'data' => $attendance,
         ]);
     }
+
+    // ------------------------
+    // ABSENT MARK
+    // ------------------------
+    public function markAbsent(Request $request)
+    {
+        $request->validate([
+            'class_id' => 'required|exists:classes,id',
+        ]);
+
+        $today = Carbon::now();
+        if ($today->dayOfWeek == 0 || $today->dayOfWeek == 6) {
+            return response()->json([
+                'message' => 'Attendance cannot be recorded on Saturday or Sunday.',
+            ], 403);
+        }
+
+        $attendance = Attendance::where('class_id', $request->class_id)
+            ->where('date', $today->toDateString())
+            ->first();
+
+        if ($attendance && $attendance->arrived_time) {
+            return response()->json([
+                'message' => 'Arrived already marked for today, cannot mark absent.',
+            ], 409);
+        }
+
+        if ($attendance && $attendance->status === 'absent') {
+            return response()->json([
+                'message' => 'Absent already marked for today.',
+            ], 409);
+        }
+
+        if (!$attendance) {
+            $attendance = Attendance::create([
+                'class_id' => $request->class_id,
+                'cr_id'    => auth()->id(),
+                'date'     => $today->toDateString(),
+                'status'   => 'absent',
+            ]);
+        } else {
+            $attendance->update(['status' => 'absent']);
+        }
+
+        return response()->json([
+            'message' => 'Absent marked successfully.',
+            'data' => $attendance,
+        ]);
+    }
 }

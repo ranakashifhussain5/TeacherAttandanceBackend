@@ -62,6 +62,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Mark teacher left
     Route::post('/attendance/left', [AttendanceController::class,'markLeft']);
 
+    // Mark teacher absent
+    Route::post('/attendance/absent', [AttendanceController::class,'markAbsent']);
+
     Route::get('/reports', [ReportsController::class, 'index']);
 });
 
