@@ -20,8 +20,7 @@ class ClassRoom extends Model
         'room',
         'cr_id',
         'program_id',
-        'batch_id',
-        'shift_id'
+        'batch_id'
     ];
 
     public function cr()
@@ -37,11 +36,6 @@ class ClassRoom extends Model
     public function batch()
     {
         return $this->belongsTo(Batch::class);
-    }
-
-    public function shift()
-    {
-        return $this->belongsTo(Shift::class);
     }
 
      public function attendances()

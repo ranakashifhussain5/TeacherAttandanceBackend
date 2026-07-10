@@ -48,18 +48,16 @@ class ReportsController extends Controller
         $query = Attendance::query()
             ->select('attendances.*')
             ->with(['classRoom' => function($q){
-                $q->select('id','class_name','teacher_name','start_time','end_time','day','room','cr_id','program_id','batch_id','shift_id')
-                  ->with('program:id,name', 'batch:id,start_year,end_year', 'shift:id,name');
+                $q->select('id','class_name','teacher_name','start_time','end_time','day','room','cr_id','program_id','batch_id')
+                  ->with('program:id,name', 'batch:id,start_year,end_year,shift_id', 'batch.shift:id,name');
             }]);
 
-        // If CR: restrict to their cr_id and their program/batch/shift (as we did in classes)
+        // If CR: restrict to their cr_id and their program/batch (batch already implies shift)
         if ($user->role === 'cr') {
             $query->where('attendances.cr_id', $user->id);
-            // optionally ensure class matches user's program/batch/shift:
             $query->whereHas('classRoom', function($q) use ($user){
                 $q->where('program_id', $user->program_id)
-                  ->where('batch_id', $user->batch_id)
-                  ->where('shift_id', $user->shift_id);
+                  ->where('batch_id', $user->batch_id);
             });
         } else {
             // HOD: can filter by teacher_name, class_id, or program/batch/shift drill-down
@@ -76,7 +74,11 @@ class ReportsController extends Controller
                 $query->whereHas('classRoom', function($q) use ($request){
                     if ($request->filled('program_id')) $q->where('program_id', $request->program_id);
                     if ($request->filled('batch_id')) $q->where('batch_id', $request->batch_id);
-                    if ($request->filled('shift_id')) $q->where('shift_id', $request->shift_id);
+                    if ($request->filled('shift_id')) {
+                        $q->whereHas('batch', function($bq) use ($request){
+                            $bq->where('shift_id', $request->shift_id);
+                        });
+                    }
                 });
             }
         }
@@ -173,7 +175,7 @@ class ReportsController extends Controller
                     'cr_id' => $att->cr_id,
                     'program' => optional(optional($att->classRoom)->program)->name,
                     'batch' => optional(optional($att->classRoom)->batch)->name,
-                    'shift' => optional(optional($att->classRoom)->shift)->name,
+                    'shift' => optional(optional(optional($att->classRoom)->batch)->shift)->name,
                 ];
             });
 
@@ -195,12 +197,15 @@ class ReportsController extends Controller
                 ->select('attendances.status', DB::raw('COUNT(*) as total'))
                 ->join('classes','attendances.class_id','=','classes.id');
 
+            if ($request->filled('shift_id')) {
+                $aggQuery->leftJoin('batches', 'classes.batch_id', '=', 'batches.id');
+            }
+
             // apply same CR restriction for CR users
             if ($user->role === 'cr') {
                 $aggQuery->where('attendances.cr_id', $user->id)
                          ->where('classes.program_id', $user->program_id)
-                         ->where('classes.batch_id', $user->batch_id)
-                         ->where('classes.shift_id', $user->shift_id);
+                         ->where('classes.batch_id', $user->batch_id);
             } else {
                 if ($request->filled('teacher_name')) {
                     $aggQuery->where('classes.teacher_name','like','%'.$request->teacher_name.'%');
@@ -215,7 +220,7 @@ class ReportsController extends Controller
                     $aggQuery->where('classes.batch_id', $request->batch_id);
                 }
                 if ($request->filled('shift_id')) {
-                    $aggQuery->where('classes.shift_id', $request->shift_id);
+                    $aggQuery->where('batches.shift_id', $request->shift_id);
                 }
             }
 
@@ -239,11 +244,14 @@ class ReportsController extends Controller
                 $tb = Attendance::select('classes.teacher_name', 'attendances.status', DB::raw('COUNT(*) as total'))
                     ->join('classes','attendances.class_id','=','classes.id');
 
+                if ($request->filled('shift_id')) {
+                    $tb->leftJoin('batches', 'classes.batch_id', '=', 'batches.id');
+                }
+
                 if ($user->role === 'cr') {
                     $tb->where('attendances.cr_id', $user->id)
                        ->where('classes.program_id', $user->program_id)
-                       ->where('classes.batch_id', $user->batch_id)
-                       ->where('classes.shift_id', $user->shift_id);
+                       ->where('classes.batch_id', $user->batch_id);
                 } else {
                     if ($request->filled('teacher_name')) {
                         $tb->where('classes.teacher_name','like','%'.$request->teacher_name.'%');
@@ -258,7 +266,7 @@ class ReportsController extends Controller
                         $tb->where('classes.batch_id', $request->batch_id);
                     }
                     if ($request->filled('shift_id')) {
-                        $tb->where('classes.shift_id', $request->shift_id);
+                        $tb->where('batches.shift_id', $request->shift_id);
                     }
                 }
 

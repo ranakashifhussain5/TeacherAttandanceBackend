@@ -13,7 +13,7 @@ class User extends Authenticatable
     use HasApiTokens, Notifiable;
 
     protected $fillable = [
-        'name','email','password','role','program_id','batch_id','shift_id'
+        'name','email','password','role','program_id','batch_id'
     ];
 
     protected $hidden = ['password'];
@@ -26,11 +26,6 @@ class User extends Authenticatable
     public function batch()
     {
         return $this->belongsTo(Batch::class);
-    }
-
-    public function shift()
-    {
-        return $this->belongsTo(Shift::class);
     }
 
     public function classes()

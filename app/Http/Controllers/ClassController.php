@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\ClassRoom;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class ClassController extends Controller
@@ -15,11 +16,10 @@ class ClassController extends Controller
         $user = Auth::user();
 
         if($user->role === 'cr'){
-            // CR sees only their classes in their program/batch/shift
+            // CR sees only their classes in their program/batch (batch already implies shift)
             $classes = ClassRoom::where('cr_id', $user->id)
                 ->where('program_id', $user->program_id)
                 ->where('batch_id', $user->batch_id)
-                ->where('shift_id', $user->shift_id)
                 ->get();
         } else {
             // HOD: sees all, optionally filtered for the program/batch/shift drill-down
@@ -32,7 +32,9 @@ class ClassController extends Controller
                 $query->where('batch_id', request('batch_id'));
             }
             if (request()->filled('shift_id')) {
-                $query->where('shift_id', request('shift_id'));
+                $query->whereHas('batch', function ($q) {
+                    $q->where('shift_id', request('shift_id'));
+                });
             }
 
             $classes = $query->get();
@@ -46,12 +48,11 @@ class ClassController extends Controller
     {
         $user = Auth::user();
 
-        // If CR, auto assign program, batch, shift, and cr_id
+        // If CR, auto assign program, batch, and cr_id
         if($user->role === 'cr'){
             $request->merge([
                 'program_id' => $user->program_id,
                 'batch_id' => $user->batch_id,
-                'shift_id' => $user->shift_id,
                 'cr_id' => $user->id,
             ]);
         }
@@ -65,8 +66,10 @@ class ClassController extends Controller
             'room'=>'required|string',
             'cr_id'=>'required|exists:users,id',
             'program_id'=>'required|exists:programs,id',
-            'batch_id'=>'required|exists:batches,id',
-            'shift_id'=>'required|exists:shifts,id',
+            'batch_id'=> [
+                'required',
+                Rule::exists('batches', 'id')->where('program_id', $request->program_id),
+            ],
         ]);
 
         $class = ClassRoom::create($request->all());
@@ -103,7 +106,6 @@ public function todayClasses()
         $classes = ClassRoom::where('cr_id', $user->id)
             ->where('program_id', $user->program_id)
             ->where('batch_id', $user->batch_id)
-            ->where('shift_id', $user->shift_id)
             ->where('day', $today)
             ->get();
     } else {
@@ -117,7 +119,9 @@ public function todayClasses()
             $query->where('batch_id', request('batch_id'));
         }
         if (request()->filled('shift_id')) {
-            $query->where('shift_id', request('shift_id'));
+            $query->whereHas('batch', function ($q) {
+                $q->where('shift_id', request('shift_id'));
+            });
         }
 
         $classes = $query->get();

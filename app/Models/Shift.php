@@ -8,13 +8,8 @@ class Shift extends Model
 {
     protected $fillable = ['name'];
 
-    public function users()
+    public function batches()
     {
-        return $this->hasMany(User::class);
-    }
-
-    public function classes()
-    {
-        return $this->hasMany(ClassRoom::class);
+        return $this->hasMany(Batch::class);
     }
 }

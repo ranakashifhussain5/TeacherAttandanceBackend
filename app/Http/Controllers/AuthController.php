@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
@@ -17,8 +18,11 @@ class AuthController extends Controller
             'password' => 'required|min:6',
             'role' => 'required|in:cr,hod',
             'program_id' => 'required_if:role,cr|nullable|exists:programs,id',
-            'batch_id' => 'required_if:role,cr|nullable|exists:batches,id',
-            'shift_id' => 'required_if:role,cr|nullable|exists:shifts,id',
+            'batch_id' => [
+                'required_if:role,cr',
+                'nullable',
+                Rule::exists('batches', 'id')->where('program_id', $request->program_id),
+            ],
         ]);
 
         $user = User::create([
@@ -28,7 +32,6 @@ class AuthController extends Controller
             'role' => $request->role,
             'program_id' => $request->program_id,
             'batch_id' => $request->batch_id,
-            'shift_id' => $request->shift_id,
         ]);
 
         return response()->json(['message' => 'User registered successfully']);
@@ -40,8 +43,7 @@ class AuthController extends Controller
             return response()->json(['error' => 'Invalid credentials'], 401);
         }
 
-        /** @var \App\Models\User $user */
-        $user = Auth::user();
+        $user = User::find(Auth::id());
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -57,7 +59,10 @@ class AuthController extends Controller
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        $user->currentAccessToken()->delete();
+        /** @var \Laravel\Sanctum\PersonalAccessToken $token */
+        $token = $user->currentAccessToken();
+
+        $token->delete();
 
         return response()->json(['message'=>'Logged out']);
     }

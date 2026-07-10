@@ -17,4 +17,9 @@ class Program extends Model
     {
         return $this->hasMany(ClassRoom::class);
     }
+
+    public function batches()
+    {
+        return $this->hasMany(Batch::class);
+    }
 }

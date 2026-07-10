@@ -6,7 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Batch extends Model
 {
-    protected $fillable = ['start_year', 'end_year'];
+    protected $fillable = ['program_id', 'shift_id', 'start_year', 'end_year'];
+
+    public function program()
+    {
+        return $this->belongsTo(Program::class);
+    }
+
+    public function shift()
+    {
+        return $this->belongsTo(Shift::class);
+    }
 
     public function users()
     {
@@ -20,6 +30,9 @@ class Batch extends Model
 
     public function getNameAttribute()
     {
-        return "{$this->start_year}-{$this->end_year}";
+        $range = "{$this->start_year}-{$this->end_year}";
+        $shiftName = optional($this->shift)->name;
+
+        return $shiftName ? "{$range} {$shiftName}" : $range;
     }
 }

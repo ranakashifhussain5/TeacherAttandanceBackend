@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::table('classes', function (Blueprint $table) {
             $table->foreignId('program_id')->nullable()->after('teacher_name')->constrained('programs')->onDelete('set null');
             $table->foreignId('batch_id')->nullable()->after('program_id')->constrained('batches')->onDelete('set null');
-            $table->foreignId('shift_id')->nullable()->after('batch_id')->constrained('shifts')->onDelete('set null');
         });
 
         Schema::table('classes', function (Blueprint $table) {
@@ -30,7 +29,6 @@ return new class extends Migration
         Schema::table('classes', function (Blueprint $table) {
             $table->dropConstrainedForeignId('program_id');
             $table->dropConstrainedForeignId('batch_id');
-            $table->dropConstrainedForeignId('shift_id');
         });
     }
 };
