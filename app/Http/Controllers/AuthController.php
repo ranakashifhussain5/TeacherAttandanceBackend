@@ -15,7 +15,10 @@ class AuthController extends Controller
             'name' => 'required',
             'email' => 'required|email|unique:users',
             'password' => 'required|min:6',
-            'role' => 'required|in:admin,cr,hod'
+            'role' => 'required|in:cr,hod',
+            'program_id' => 'required_if:role,cr|nullable|exists:programs,id',
+            'batch_id' => 'required_if:role,cr|nullable|exists:batches,id',
+            'shift_id' => 'required_if:role,cr|nullable|exists:shifts,id',
         ]);
 
         $user = User::create([
@@ -23,10 +26,9 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => $request->role,
-            'department' => $request->department,
-            'shift' => $request->shift,
-            'start_session' => $request->start_session,
-            'end_session' => $request->end_session,
+            'program_id' => $request->program_id,
+            'batch_id' => $request->batch_id,
+            'shift_id' => $request->shift_id,
         ]);
 
         return response()->json(['message' => 'User registered successfully']);
@@ -38,18 +40,24 @@ class AuthController extends Controller
             return response()->json(['error' => 'Invalid credentials'], 401);
         }
 
-        $token = Auth::user()->createToken('auth_token')->plainTextToken;
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'token' => $token,
-            'user' => Auth::user()
+            'user' => $user
         ]);
 
     }
      // Logout
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        $user->currentAccessToken()->delete();
 
         return response()->json(['message'=>'Logged out']);
     }

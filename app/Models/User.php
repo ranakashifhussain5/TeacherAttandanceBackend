@@ -13,14 +13,29 @@ class User extends Authenticatable
     use HasApiTokens, Notifiable;
 
     protected $fillable = [
-        'name','email','password','role','department','shift','start_session','end_session'
+        'name','email','password','role','program_id','batch_id','shift_id'
     ];
 
     protected $hidden = ['password'];
 
+    public function program()
+    {
+        return $this->belongsTo(Program::class);
+    }
+
+    public function batch()
+    {
+        return $this->belongsTo(Batch::class);
+    }
+
+    public function shift()
+    {
+        return $this->belongsTo(Shift::class);
+    }
+
     public function classes()
     {
-        return $this->hasMany(ClassModel::class, 'cr_id');
+        return $this->hasMany(ClassRoom::class, 'cr_id');
     }
 
     public function attendances()

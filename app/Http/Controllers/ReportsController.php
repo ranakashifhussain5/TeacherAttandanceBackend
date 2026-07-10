@@ -37,6 +37,9 @@ class ReportsController extends Controller
             'year' => 'nullable|integer|min:1900',
             'class_id' => 'nullable|exists:classes,id',
             'teacher_name' => 'nullable|string',
+            'program_id' => 'nullable|exists:programs,id',
+            'batch_id' => 'nullable|exists:batches,id',
+            'shift_id' => 'nullable|exists:shifts,id',
         ]);
 
         $type = $request->input('type', 'today'); // default to today if not provided
@@ -45,20 +48,21 @@ class ReportsController extends Controller
         $query = Attendance::query()
             ->select('attendances.*')
             ->with(['classRoom' => function($q){
-                $q->select('id','class_name','teacher_name','start_time','end_time','day','room','cr_id','department','start_session','end_session');
+                $q->select('id','class_name','teacher_name','start_time','end_time','day','room','cr_id','program_id','batch_id','shift_id')
+                  ->with('program:id,name', 'batch:id,start_year,end_year', 'shift:id,name');
             }]);
 
-        // If CR: restrict to their cr_id and their department/session (as we did in classes)
+        // If CR: restrict to their cr_id and their program/batch/shift (as we did in classes)
         if ($user->role === 'cr') {
             $query->where('attendances.cr_id', $user->id);
-            // optionally ensure class matches user's session/department:
+            // optionally ensure class matches user's program/batch/shift:
             $query->whereHas('classRoom', function($q) use ($user){
-                $q->where('department', $user->department)
-                  ->where('start_session', $user->start_session)
-                  ->where('end_session', $user->end_session);
+                $q->where('program_id', $user->program_id)
+                  ->where('batch_id', $user->batch_id)
+                  ->where('shift_id', $user->shift_id);
             });
         } else {
-            // Admin: can filter by teacher_name or class_id if provided
+            // HOD: can filter by teacher_name, class_id, or program/batch/shift drill-down
             if ($request->filled('teacher_name')) {
                 $tn = $request->teacher_name;
                 $query->whereHas('classRoom', function($q) use($tn){
@@ -67,6 +71,13 @@ class ReportsController extends Controller
             }
             if ($request->filled('class_id')) {
                 $query->where('class_id', $request->class_id);
+            }
+            if ($request->filled('program_id') || $request->filled('batch_id') || $request->filled('shift_id')) {
+                $query->whereHas('classRoom', function($q) use ($request){
+                    if ($request->filled('program_id')) $q->where('program_id', $request->program_id);
+                    if ($request->filled('batch_id')) $q->where('batch_id', $request->batch_id);
+                    if ($request->filled('shift_id')) $q->where('shift_id', $request->shift_id);
+                });
             }
         }
 
@@ -160,6 +171,9 @@ class ReportsController extends Controller
                     'left_time' => $att->left_time,
                     'status' => $att->status,
                     'cr_id' => $att->cr_id,
+                    'program' => optional(optional($att->classRoom)->program)->name,
+                    'batch' => optional(optional($att->classRoom)->batch)->name,
+                    'shift' => optional(optional($att->classRoom)->shift)->name,
                 ];
             });
 
@@ -184,15 +198,24 @@ class ReportsController extends Controller
             // apply same CR restriction for CR users
             if ($user->role === 'cr') {
                 $aggQuery->where('attendances.cr_id', $user->id)
-                         ->where('classes.department', $user->department)
-                         ->where('classes.start_session', $user->start_session)
-                         ->where('classes.end_session', $user->end_session);
+                         ->where('classes.program_id', $user->program_id)
+                         ->where('classes.batch_id', $user->batch_id)
+                         ->where('classes.shift_id', $user->shift_id);
             } else {
                 if ($request->filled('teacher_name')) {
                     $aggQuery->where('classes.teacher_name','like','%'.$request->teacher_name.'%');
                 }
                 if ($request->filled('class_id')) {
                     $aggQuery->where('attendances.class_id', $request->class_id);
+                }
+                if ($request->filled('program_id')) {
+                    $aggQuery->where('classes.program_id', $request->program_id);
+                }
+                if ($request->filled('batch_id')) {
+                    $aggQuery->where('classes.batch_id', $request->batch_id);
+                }
+                if ($request->filled('shift_id')) {
+                    $aggQuery->where('classes.shift_id', $request->shift_id);
                 }
             }
 
@@ -218,15 +241,24 @@ class ReportsController extends Controller
 
                 if ($user->role === 'cr') {
                     $tb->where('attendances.cr_id', $user->id)
-                       ->where('classes.department', $user->department)
-                       ->where('classes.start_session', $user->start_session)
-                       ->where('classes.end_session', $user->end_session);
+                       ->where('classes.program_id', $user->program_id)
+                       ->where('classes.batch_id', $user->batch_id)
+                       ->where('classes.shift_id', $user->shift_id);
                 } else {
                     if ($request->filled('teacher_name')) {
                         $tb->where('classes.teacher_name','like','%'.$request->teacher_name.'%');
                     }
                     if ($request->filled('class_id')) {
                         $tb->where('attendances.class_id', $request->class_id);
+                    }
+                    if ($request->filled('program_id')) {
+                        $tb->where('classes.program_id', $request->program_id);
+                    }
+                    if ($request->filled('batch_id')) {
+                        $tb->where('classes.batch_id', $request->batch_id);
+                    }
+                    if ($request->filled('shift_id')) {
+                        $tb->where('classes.shift_id', $request->shift_id);
                     }
                 }
 

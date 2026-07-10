@@ -15,15 +15,27 @@ class ClassController extends Controller
         $user = Auth::user();
 
         if($user->role === 'cr'){
-            // CR sees only their classes in their department & session
+            // CR sees only their classes in their program/batch/shift
             $classes = ClassRoom::where('cr_id', $user->id)
-                ->where('department', $user->department)
-                ->where('start_session', $user->start_session)
-                ->where('end_session', $user->end_session)
+                ->where('program_id', $user->program_id)
+                ->where('batch_id', $user->batch_id)
+                ->where('shift_id', $user->shift_id)
                 ->get();
         } else {
-            // Admin sees all
-            $classes = ClassRoom::all();
+            // HOD: sees all, optionally filtered for the program/batch/shift drill-down
+            $query = ClassRoom::query();
+
+            if (request()->filled('program_id')) {
+                $query->where('program_id', request('program_id'));
+            }
+            if (request()->filled('batch_id')) {
+                $query->where('batch_id', request('batch_id'));
+            }
+            if (request()->filled('shift_id')) {
+                $query->where('shift_id', request('shift_id'));
+            }
+
+            $classes = $query->get();
         }
 
         return response()->json($classes);
@@ -34,12 +46,12 @@ class ClassController extends Controller
     {
         $user = Auth::user();
 
-        // If CR, auto assign department, session, and cr_id
+        // If CR, auto assign program, batch, shift, and cr_id
         if($user->role === 'cr'){
             $request->merge([
-                'department' => $user->department,
-                'start_session' => $user->start_session,
-                'end_session' => $user->end_session,
+                'program_id' => $user->program_id,
+                'batch_id' => $user->batch_id,
+                'shift_id' => $user->shift_id,
                 'cr_id' => $user->id,
             ]);
         }
@@ -52,9 +64,9 @@ class ClassController extends Controller
             'end_time'=>'required',
             'room'=>'required|string',
             'cr_id'=>'required|exists:users,id',
-            'department'=>'required|string',
-            'start_session'=>'required|integer',
-            'end_session'=>'required|integer',
+            'program_id'=>'required|exists:programs,id',
+            'batch_id'=>'required|exists:batches,id',
+            'shift_id'=>'required|exists:shifts,id',
         ]);
 
         $class = ClassRoom::create($request->all());
@@ -89,14 +101,26 @@ public function todayClasses()
     if($user->role === 'cr'){
         // CR sees only their classes for today
         $classes = ClassRoom::where('cr_id', $user->id)
-            ->where('department', $user->department)
-            ->where('start_session', $user->start_session)
-            ->where('end_session', $user->end_session)
+            ->where('program_id', $user->program_id)
+            ->where('batch_id', $user->batch_id)
+            ->where('shift_id', $user->shift_id)
             ->where('day', $today)
             ->get();
     } else {
-        // Admin sees all classes for today
-        $classes = ClassRoom::where('day', $today)->get();
+        // HOD sees all classes for today, optionally filtered
+        $query = ClassRoom::where('day', $today);
+
+        if (request()->filled('program_id')) {
+            $query->where('program_id', request('program_id'));
+        }
+        if (request()->filled('batch_id')) {
+            $query->where('batch_id', request('batch_id'));
+        }
+        if (request()->filled('shift_id')) {
+            $query->where('shift_id', request('shift_id'));
+        }
+
+        $classes = $query->get();
     }
 
     return response()->json($classes);

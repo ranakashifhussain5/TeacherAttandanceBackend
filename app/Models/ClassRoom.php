@@ -16,18 +16,34 @@ class ClassRoom extends Model
         'teacher_name',
         'day',
         'start_time',
-        'end_time', 
+        'end_time',
         'room',
         'cr_id',
-        'department',
-        'start_session',
-        'end_session'
+        'program_id',
+        'batch_id',
+        'shift_id'
     ];
 
     public function cr()
     {
         return $this->belongsTo(User::class, 'cr_id');
     }
+
+    public function program()
+    {
+        return $this->belongsTo(Program::class);
+    }
+
+    public function batch()
+    {
+        return $this->belongsTo(Batch::class);
+    }
+
+    public function shift()
+    {
+        return $this->belongsTo(Shift::class);
+    }
+
      public function attendances()
     {
         return $this->hasMany(Attendance::class,'class_id');

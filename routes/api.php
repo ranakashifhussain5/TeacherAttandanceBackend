@@ -1,9 +1,12 @@
 <?php
-use App\Http\Controllers\ClassController; 
+use App\Http\Controllers\ClassController;
 use App\Http\Controllers\AttendanceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\BatchController;
+use App\Http\Controllers\ShiftController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,10 +23,23 @@ use App\Http\Controllers\AuthController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+// Public master-data lists (needed so a not-yet-registered CR can populate dropdowns)
+Route::get('/programs', [ProgramController::class, 'index']);
+Route::get('/batches', [BatchController::class, 'index']);
+Route::get('/shifts', [ShiftController::class, 'index']);
+
 Route::middleware('auth:sanctum')->group(function () {
 
 
      Route::post('/logout', [AuthController::class,'logout']);
+
+    // Program / Batch / Shift management (HOD-only, enforced in controllers)
+    Route::post('/programs', [ProgramController::class, 'store']);
+    Route::delete('/programs/{id}', [ProgramController::class, 'destroy']);
+    Route::post('/batches', [BatchController::class, 'store']);
+    Route::delete('/batches/{id}', [BatchController::class, 'destroy']);
+    Route::post('/shifts', [ShiftController::class, 'store']);
+    Route::delete('/shifts/{id}', [ShiftController::class, 'destroy']);
     Route::get('/attendances', [AttendanceController::class, 'index']);
 
 
