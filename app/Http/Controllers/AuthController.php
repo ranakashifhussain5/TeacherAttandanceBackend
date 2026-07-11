@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
@@ -53,6 +54,43 @@ class AuthController extends Controller
         ]);
 
     }
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'new_password' => 'required|min:6|confirmed',
+        ]);
+
+        $user = User::find($request->user()->id);
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json(['message' => 'Current password is incorrect'], 422);
+        }
+
+        $user->update(['password' => Hash::make($request->new_password)]);
+
+        return response()->json(['message' => 'Password changed successfully']);
+    }
+
+    public function updateProfilePicture(Request $request)
+    {
+        $request->validate([
+            'profile_pic' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        $user = User::find($request->user()->id);
+
+        if ($user->profile_pic) {
+            Storage::disk('public')->delete($user->profile_pic);
+        }
+
+        $path = $request->file('profile_pic')->store('profile_pics', 'public');
+
+        $user->update(['profile_pic' => $path]);
+
+        return response()->json(['message' => 'Profile picture updated', 'user' => $user]);
+    }
+
      // Logout
     public function logout(Request $request)
     {

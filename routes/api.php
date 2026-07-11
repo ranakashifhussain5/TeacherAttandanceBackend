@@ -33,6 +33,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
      Route::post('/logout', [AuthController::class,'logout']);
 
+    Route::post('/change-password', [AuthController::class,'changePassword']);
+
+    Route::post('/profile-picture', [AuthController::class,'updateProfilePicture']);
+
     // Program / Batch / Shift management (HOD-only, enforced in controllers)
     Route::post('/programs', [ProgramController::class, 'store']);
     Route::delete('/programs/{id}', [ProgramController::class, 'destroy']);
