@@ -31,11 +31,16 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => $request->role,
+            'status' => $request->role === 'cr' ? 'pending' : 'active',
             'program_id' => $request->program_id,
             'batch_id' => $request->batch_id,
         ]);
 
-        return response()->json(['message' => 'User registered successfully']);
+        $message = $request->role === 'cr'
+            ? 'Registered successfully. Your account is awaiting HOD approval.'
+            : 'User registered successfully';
+
+        return response()->json(['message' => $message]);
     }
 
     public function login(Request $request)
@@ -45,6 +50,16 @@ class AuthController extends Controller
         }
 
         $user = User::find(Auth::id());
+
+        if ($user->status === 'pending') {
+            return response()->json(['message' => 'Your account is awaiting HOD approval.'], 403);
+        }
+
+        if ($user->status === 'blocked') {
+            return response()->json([
+                'message' => 'Your account has been blocked.' . ($user->blocked_reason ? ' Reason: ' . $user->blocked_reason : ''),
+            ], 403);
+        }
 
         $token = $user->createToken('auth_token')->plainTextToken;
 

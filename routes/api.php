@@ -8,6 +8,7 @@ use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TeacherController;
+use App\Http\Controllers\CrController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,6 +52,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/teachers', [TeacherController::class, 'index']);
     Route::post('/teachers', [TeacherController::class, 'store']);
     Route::delete('/teachers/{id}', [TeacherController::class, 'destroy']);
+
+    // CR list + approve/block (HOD-only, enforced in controller)
+    Route::get('/crs', [CrController::class, 'index']);
+    Route::patch('/crs/{id}/status', [CrController::class, 'updateStatus']);
 
 
      // List classes
