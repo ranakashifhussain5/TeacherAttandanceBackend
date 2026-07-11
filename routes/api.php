@@ -7,6 +7,7 @@ use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\BatchController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\TeacherController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,6 +46,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/shifts', [ShiftController::class, 'store']);
     Route::delete('/shifts/{id}', [ShiftController::class, 'destroy']);
     Route::get('/attendances', [AttendanceController::class, 'index']);
+
+    // Teacher master list (HOD manages it, CR picks from it when adding a schedule)
+    Route::get('/teachers', [TeacherController::class, 'index']);
+    Route::post('/teachers', [TeacherController::class, 'store']);
+    Route::delete('/teachers/{id}', [TeacherController::class, 'destroy']);
 
 
      // List classes

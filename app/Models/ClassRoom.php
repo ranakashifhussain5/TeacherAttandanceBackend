@@ -13,7 +13,7 @@ class ClassRoom extends Model
 
     protected $fillable = [
         'class_name',
-        'teacher_name',
+        'teacher_id',
         'day',
         'start_time',
         'end_time',
@@ -26,6 +26,11 @@ class ClassRoom extends Model
     public function cr()
     {
         return $this->belongsTo(User::class, 'cr_id');
+    }
+
+    public function teacher()
+    {
+        return $this->belongsTo(Teacher::class);
     }
 
     public function program()

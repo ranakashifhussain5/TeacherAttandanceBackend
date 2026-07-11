@@ -20,7 +20,8 @@ class ReportsController extends Controller
      * - start_date, end_date (YYYY-MM-DD)
      * - month (1-12) & year (YYYY)  -> for monthly
      * - class_id
-     * - teacher_name
+     * - teacher_id
+     * - teacher_name (partial match, searches the teachers table)
      *
      * Example:
      * /api/reports?type=monthly&month=11&year=2025
@@ -36,6 +37,7 @@ class ReportsController extends Controller
             'month' => 'nullable|integer|min:1|max:12',
             'year' => 'nullable|integer|min:1900',
             'class_id' => 'nullable|exists:classes,id',
+            'teacher_id' => 'nullable|exists:teachers,id',
             'teacher_name' => 'nullable|string',
             'program_id' => 'nullable|exists:programs,id',
             'batch_id' => 'nullable|exists:batches,id',
@@ -48,8 +50,8 @@ class ReportsController extends Controller
         $query = Attendance::query()
             ->select('attendances.*')
             ->with(['classRoom' => function($q){
-                $q->select('id','class_name','teacher_name','start_time','end_time','day','room','cr_id','program_id','batch_id')
-                  ->with('program:id,name', 'batch:id,start_year,end_year,shift_id', 'batch.shift:id,name');
+                $q->select('id','class_name','teacher_id','start_time','end_time','day','room','cr_id','program_id','batch_id')
+                  ->with('teacher:id,name', 'program:id,name', 'batch:id,start_year,end_year,shift_id', 'batch.shift:id,name');
             }]);
 
         // If CR: restrict to their cr_id and their program/batch (batch already implies shift)
@@ -60,11 +62,17 @@ class ReportsController extends Controller
                   ->where('batch_id', $user->batch_id);
             });
         } else {
-            // HOD: can filter by teacher_name, class_id, or program/batch/shift drill-down
+            // HOD: can filter by teacher_id, teacher_name, class_id, or program/batch/shift drill-down
+            if ($request->filled('teacher_id')) {
+                $tid = $request->teacher_id;
+                $query->whereHas('classRoom', function($q) use($tid){
+                    $q->where('teacher_id', $tid);
+                });
+            }
             if ($request->filled('teacher_name')) {
                 $tn = $request->teacher_name;
-                $query->whereHas('classRoom', function($q) use($tn){
-                    $q->where('teacher_name', 'like', "%$tn%");
+                $query->whereHas('classRoom.teacher', function($q) use($tn){
+                    $q->where('name', 'like', "%$tn%");
                 });
             }
             if ($request->filled('class_id')) {
@@ -165,7 +173,8 @@ class ReportsController extends Controller
                     'date' => $att->date,
                     'class_id' => $att->class_id,
                     'class_name' => optional($att->classRoom)->class_name,
-                    'teacher_name' => optional($att->classRoom)->teacher_name,
+                    'teacher_id' => optional($att->classRoom)->teacher_id,
+                    'teacher_name' => optional(optional($att->classRoom)->teacher)->name,
                     'start_time' => optional($att->classRoom)->start_time,
                     'end_time' => optional($att->classRoom)->end_time,
                     'room' => optional($att->classRoom)->room,
@@ -195,7 +204,8 @@ class ReportsController extends Controller
             // base query for counts
             $aggQuery = Attendance::query()
                 ->select('attendances.status', DB::raw('COUNT(*) as total'))
-                ->join('classes','attendances.class_id','=','classes.id');
+                ->join('classes','attendances.class_id','=','classes.id')
+                ->leftJoin('teachers', 'classes.teacher_id', '=', 'teachers.id');
 
             if ($request->filled('shift_id')) {
                 $aggQuery->leftJoin('batches', 'classes.batch_id', '=', 'batches.id');
@@ -207,8 +217,11 @@ class ReportsController extends Controller
                          ->where('classes.program_id', $user->program_id)
                          ->where('classes.batch_id', $user->batch_id);
             } else {
+                if ($request->filled('teacher_id')) {
+                    $aggQuery->where('classes.teacher_id', $request->teacher_id);
+                }
                 if ($request->filled('teacher_name')) {
-                    $aggQuery->where('classes.teacher_name','like','%'.$request->teacher_name.'%');
+                    $aggQuery->where('teachers.name','like','%'.$request->teacher_name.'%');
                 }
                 if ($request->filled('class_id')) {
                     $aggQuery->where('attendances.class_id', $request->class_id);
@@ -239,10 +252,11 @@ class ReportsController extends Controller
 
             // Optionally: teacher-wise breakdown
             $teacherBreakdown = [];
-            if ($request->filled('teacher_name') || $request->filled('class_id') || $request->input('group_by_teacher', false)) {
-                // group by teacher_name and status
-                $tb = Attendance::select('classes.teacher_name', 'attendances.status', DB::raw('COUNT(*) as total'))
-                    ->join('classes','attendances.class_id','=','classes.id');
+            if ($request->filled('teacher_id') || $request->filled('teacher_name') || $request->filled('class_id') || $request->input('group_by_teacher', false)) {
+                // group by teacher (id) and status
+                $tb = Attendance::select('teachers.id as teacher_id', 'teachers.name as teacher_name', 'attendances.status', DB::raw('COUNT(*) as total'))
+                    ->join('classes','attendances.class_id','=','classes.id')
+                    ->leftJoin('teachers', 'classes.teacher_id', '=', 'teachers.id');
 
                 if ($request->filled('shift_id')) {
                     $tb->leftJoin('batches', 'classes.batch_id', '=', 'batches.id');
@@ -253,8 +267,11 @@ class ReportsController extends Controller
                        ->where('classes.program_id', $user->program_id)
                        ->where('classes.batch_id', $user->batch_id);
                 } else {
+                    if ($request->filled('teacher_id')) {
+                        $tb->where('classes.teacher_id', $request->teacher_id);
+                    }
                     if ($request->filled('teacher_name')) {
-                        $tb->where('classes.teacher_name','like','%'.$request->teacher_name.'%');
+                        $tb->where('teachers.name','like','%'.$request->teacher_name.'%');
                     }
                     if ($request->filled('class_id')) {
                         $tb->where('attendances.class_id', $request->class_id);
@@ -278,7 +295,7 @@ class ReportsController extends Controller
                     $tb->whereRaw('DAYOFWEEK(attendances.date) != 1');
                 } catch (\Exception $e) {}
 
-                $tb = $tb->groupBy('classes.teacher_name', 'attendances.status')
+                $tb = $tb->groupBy('teachers.id', 'teachers.name', 'attendances.status')
                          ->get();
 
                 // reshape into: [ teacher => { present: x, late: y, absent: z } ]

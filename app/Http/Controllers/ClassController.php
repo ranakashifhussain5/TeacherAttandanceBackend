@@ -17,13 +17,14 @@ class ClassController extends Controller
 
         if($user->role === 'cr'){
             // CR sees only their classes in their program/batch (batch already implies shift)
-            $classes = ClassRoom::where('cr_id', $user->id)
+            $classes = ClassRoom::with('teacher:id,name')
+                ->where('cr_id', $user->id)
                 ->where('program_id', $user->program_id)
                 ->where('batch_id', $user->batch_id)
                 ->get();
         } else {
             // HOD: sees all, optionally filtered for the program/batch/shift drill-down
-            $query = ClassRoom::query();
+            $query = ClassRoom::with('teacher:id,name');
 
             if (request()->filled('program_id')) {
                 $query->where('program_id', request('program_id'));
@@ -59,7 +60,7 @@ class ClassController extends Controller
 
         $request->validate([
             'class_name'=>'required|string',
-            'teacher_name'=>'required|string',
+            'teacher_id'=>'required|exists:teachers,id',
             'day'=>'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'start_time'=>'required',
             'end_time'=>'required',
@@ -103,14 +104,15 @@ public function todayClasses()
 
     if($user->role === 'cr'){
         // CR sees only their classes for today
-        $classes = ClassRoom::where('cr_id', $user->id)
+        $classes = ClassRoom::with('teacher:id,name')
+            ->where('cr_id', $user->id)
             ->where('program_id', $user->program_id)
             ->where('batch_id', $user->batch_id)
             ->where('day', $today)
             ->get();
     } else {
         // HOD sees all classes for today, optionally filtered
-        $query = ClassRoom::where('day', $today);
+        $query = ClassRoom::with('teacher:id,name')->where('day', $today);
 
         if (request()->filled('program_id')) {
             $query->where('program_id', request('program_id'));
