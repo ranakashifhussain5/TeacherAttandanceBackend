@@ -16,7 +16,12 @@ class CrController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $query = User::where('role', 'cr')->with('program:id,name', 'batch:id,start_year,end_year');
+        // Only CRs who signed up under a program this HOD owns.
+        $query = User::where('role', 'cr')
+            ->whereHas('program', function ($q) use ($user) {
+                $q->where('hod_id', $user->id);
+            })
+            ->with('program:id,name', 'batch:id,start_year,end_year');
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -37,7 +42,12 @@ class CrController extends Controller
             'reason' => 'nullable|string',
         ]);
 
-        $cr = User::where('role', 'cr')->findOrFail($id);
+        // Only allow a HOD to act on CRs who belong to one of their own programs.
+        $cr = User::where('role', 'cr')
+            ->whereHas('program', function ($q) use ($user) {
+                $q->where('hod_id', $user->id);
+            })
+            ->findOrFail($id);
 
         $cr->status = $request->status;
         if ($request->status === 'blocked') {

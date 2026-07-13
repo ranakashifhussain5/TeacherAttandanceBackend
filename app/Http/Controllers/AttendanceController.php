@@ -3,12 +3,36 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
-use App\Models\Classes;
+use App\Models\ClassRoom;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
 {
+    // ------------------------
+    // LIST ATTENDANCE
+    // ------------------------
+    public function index(Request $request)
+    {
+        $user = auth()->user();
+
+        $query = Attendance::with('classRoom:id,class_name,teacher_id,start_time,end_time,room');
+
+        if ($user->role === 'cr') {
+            $query->where('cr_id', $user->id);
+        } elseif ($request->filled('class_id')) {
+            $query->where('class_id', $request->class_id);
+        }
+
+        if ($request->filled('date')) {
+            $query->where('date', $request->date);
+        }
+
+        $attendances = $query->orderBy('date', 'desc')->get();
+
+        return response()->json($attendances);
+    }
+
     // ------------------------
     // ARRIVED MARK
     // ------------------------
@@ -26,7 +50,7 @@ class AttendanceController extends Controller
             ], 403);
         }
 
-        $class = Classes::find($request->class_id);
+        $class = ClassRoom::find($request->class_id);
 
         // Prevent double arrived entry
         $attendance = Attendance::where('class_id', $class->id)

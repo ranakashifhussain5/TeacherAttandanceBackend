@@ -10,6 +10,14 @@ class ProgramController extends Controller
 {
     public function index()
     {
+        $user = Auth::guard('sanctum')->user();
+
+        // A logged-in HOD only sees the programs they created.
+        // Anyone else (public CR-signup dropdown, or a CR) sees every program.
+        if ($user && $user->role === 'hod') {
+            return response()->json(Program::where('hod_id', $user->id)->get());
+        }
+
         return response()->json(Program::all());
     }
 
@@ -24,7 +32,7 @@ class ProgramController extends Controller
             'name' => 'required|string|unique:programs,name',
         ]);
 
-        $program = Program::create(['name' => $request->name]);
+        $program = Program::create(['name' => $request->name, 'hod_id' => $user->id]);
 
         return response()->json(['message' => 'Program created', 'program' => $program], 201);
     }
@@ -37,6 +45,9 @@ class ProgramController extends Controller
         }
 
         $program = Program::findOrFail($id);
+        if ($program->hod_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
         $program->delete();
 
         return response()->json(['message' => 'Program deleted']);

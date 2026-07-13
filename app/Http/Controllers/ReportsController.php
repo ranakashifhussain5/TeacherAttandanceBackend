@@ -62,7 +62,12 @@ class ReportsController extends Controller
                   ->where('batch_id', $user->batch_id);
             });
         } else {
-            // HOD: can filter by teacher_id, teacher_name, class_id, or program/batch/shift drill-down
+            // HOD: only ever sees attendance under programs they own, and can
+            // further filter by teacher_id, teacher_name, class_id, or program/batch/shift
+            $query->whereHas('classRoom.program', function($q) use ($user){
+                $q->where('hod_id', $user->id);
+            });
+
             if ($request->filled('teacher_id')) {
                 $tid = $request->teacher_id;
                 $query->whereHas('classRoom', function($q) use($tid){
@@ -217,6 +222,9 @@ class ReportsController extends Controller
                          ->where('classes.program_id', $user->program_id)
                          ->where('classes.batch_id', $user->batch_id);
             } else {
+                $aggQuery->join('programs', 'classes.program_id', '=', 'programs.id')
+                          ->where('programs.hod_id', $user->id);
+
                 if ($request->filled('teacher_id')) {
                     $aggQuery->where('classes.teacher_id', $request->teacher_id);
                 }
@@ -267,6 +275,9 @@ class ReportsController extends Controller
                        ->where('classes.program_id', $user->program_id)
                        ->where('classes.batch_id', $user->batch_id);
                 } else {
+                    $tb->join('programs', 'classes.program_id', '=', 'programs.id')
+                       ->where('programs.hod_id', $user->id);
+
                     if ($request->filled('teacher_id')) {
                         $tb->where('classes.teacher_id', $request->teacher_id);
                     }

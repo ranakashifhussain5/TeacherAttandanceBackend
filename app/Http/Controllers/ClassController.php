@@ -23,8 +23,12 @@ class ClassController extends Controller
                 ->where('batch_id', $user->batch_id)
                 ->get();
         } else {
-            // HOD: sees all, optionally filtered for the program/batch/shift drill-down
-            $query = ClassRoom::with('teacher:id,name');
+            // HOD: sees only classes under programs they own, optionally filtered
+            // for the program/batch/shift drill-down
+            $query = ClassRoom::with('teacher:id,name')
+                ->whereHas('program', function ($q) use ($user) {
+                    $q->where('hod_id', $user->id);
+                });
 
             if (request()->filled('program_id')) {
                 $query->where('program_id', request('program_id'));
@@ -73,6 +77,14 @@ class ClassController extends Controller
             ],
         ]);
 
+        // HOD can only create classes under a program they own.
+        if ($user->role === 'hod') {
+            $program = \App\Models\Program::find($request->program_id);
+            if (!$program || $program->hod_id !== $user->id) {
+                return response()->json(['message' => 'Unauthorized: not your program'], 403);
+            }
+        }
+
         $class = ClassRoom::create($request->all());
 
         return response()->json(['message'=>'Class created','class'=>$class],201);
@@ -81,7 +93,16 @@ class ClassController extends Controller
     // Update class
     public function update(Request $request, $id)
     {
-        $class = ClassRoom::findOrFail($id);
+        $user = Auth::user();
+        $class = ClassRoom::with('program')->findOrFail($id);
+
+        if ($user->role === 'cr' && $class->cr_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        if ($user->role === 'hod' && optional($class->program)->hod_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $class->update($request->all());
 
         return response()->json(['message'=>'Class updated','class'=>$class]);
@@ -90,7 +111,16 @@ class ClassController extends Controller
     // Delete class
     public function destroy($id)
     {
-        $class = ClassRoom::findOrFail($id);
+        $user = Auth::user();
+        $class = ClassRoom::with('program')->findOrFail($id);
+
+        if ($user->role === 'cr' && $class->cr_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+        if ($user->role === 'hod' && optional($class->program)->hod_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
         $class->delete();
 
         return response()->json(['message'=>'Class deleted']);
@@ -111,8 +141,12 @@ public function todayClasses()
             ->where('day', $today)
             ->get();
     } else {
-        // HOD sees all classes for today, optionally filtered
-        $query = ClassRoom::with('teacher:id,name')->where('day', $today);
+        // HOD sees only today's classes under programs they own, optionally filtered
+        $query = ClassRoom::with('teacher:id,name')
+            ->where('day', $today)
+            ->whereHas('program', function ($q) use ($user) {
+                $q->where('hod_id', $user->id);
+            });
 
         if (request()->filled('program_id')) {
             $query->where('program_id', request('program_id'));
